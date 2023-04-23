@@ -1,0 +1,131 @@
+Dockerfile for Java application:
+
+FROM openjdk:11-jdk
+
+WORKDIR /app
+
+COPY target/myapp.jar /app
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "myapp.jar"]
+
+Dockerfile for MongoDB:
+
+FROM mongo:latest
+
+EXPOSE 27017
+
+CMD ["mongod", "--bind_ip_all"]
+
+Kubernetes deployment and service files:
+
+# MongoDB deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+spec:
+  selector:
+    matchLabels:
+      app: mongodb
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:latest
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+      volumes:
+        - name: mongodb-data
+          persistentVolumeClaim:
+            claimName: mongodb-pvc
+---
+# MongoDB service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+spec:
+  selector:
+    app: mongodb
+  ports:
+    - name: mongo
+      port: 27017
+      targetPort: 27017
+  type: ClusterIP
+
+---
+# Java application deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+spec:
+  selector:
+    matchLabels:
+      app: myapp
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+        - name: myapp
+          image: myapp:latest
+          env:
+            - name: MONGODB_HOST
+              value: mongodb
+            - name: MONGODB_PORT
+              value: "27017"
+            - name: MONGODB_DATABASE
+              value: myapp
+          ports:
+            - containerPort: 8080
+
+---
+# Java application service
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp
+spec:
+  selector:
+    app: myapp
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer
+
+---
+# Persistent volume claim for MongoDB data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+      
+Apply the Kubernetes manifests to the cluster:
+
+# Create the MongoDB persistent volume claim
+kubectl apply -f mongodb-pvc.yaml
+
+# Create the MongoDB deployment and service
+kubectl apply -f mongodb-deployment.yaml
+
+# Create the Java application deployment and service
+kubectl apply -f myapp-deployment.yaml
