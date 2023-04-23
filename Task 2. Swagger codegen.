@@ -1,0 +1,203 @@
+// pom.xml
+// add these dependencies:
+// - spring-boot-starter-web
+// - springfox-swagger2
+// - springfox-swagger-ui
+// - springfox-bean-validators
+
+// Server.java
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@ApiModel(description = "Details about the server")
+@Document(collection = "servers")
+public class Server {
+    @ApiModelProperty(notes = "The server ID")
+    @Id
+    private String id;
+    @ApiModelProperty(notes = "The server name")
+    private String name;
+    @ApiModelProperty(notes = "The server language")
+    private String language;
+    @ApiModelProperty(notes = "The server framework")
+    private String framework;
+
+    public Server(String id, String name, String language, String framework) {
+        this.id = id;
+        this.name = name;
+        this.language = language;
+        this.framework = framework;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public String getFramework() {
+        return framework;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
+    public void setFramework(String framework) {
+        this.framework = framework;
+    }
+}
+
+// ServerRepository.java
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+public interface ServerRepository extends MongoRepository<Server, String> {
+}
+
+// ServerController.java
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Optional;
+
+@Api(value = "server", tags = { "server" })
+@RestController
+@RequestMapping("/api/v1")
+public class ServerController {
+    @Autowired
+    private ServerRepository repository;
+
+    @ApiOperation(value = "Retrieve all servers or a single server by ID", response = Server.class)
+    @ApiResponses(value = {
+            @ApiResponse(code = 200, message = "Successfully retrieved server(s)"),
+            @ApiResponse(code = 404, message = "Server not found")
+    })
+    @GetMapping("/servers")
+    public ResponseEntity<List<Server>> getServers(
+            @ApiParam(value = "ID of the server to retrieve") @RequestParam(required = false) String id) {
+        List<Server> servers;
+        if (id == null) {
+            servers = repository.findAll();
+        } else {
+            Optional<Server> server = repository.findById(id);
+            if (!server.isPresent()) {
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+            servers = List.of(server.get());
+        }
+        return new ResponseEntity<>(servers, HttpStatus.OK);
+    }
+
+    @ApiOperation(value = "Create a new server", response = Server.class)
+    @ApiResponses(value = {
+            @ApiResponse(code = 201, message = "Server created"),
+            @ApiResponse(code = 400, message = "Invalid input"),
+    })
+    @PostMapping("/servers")
+    public ResponseEntity<Server> createServer(@RequestBody Server server) {
+        Server createdServer = repository.save(server);
+        return new ResponseEntity<>(createdServer, HttpStatus.CREATED);
+    }
+
+    @ApiOperation(value = "Update an existing server by ID", response = Server.class)
+    
+    @ApiResponses(value = {
+@ApiResponse(code = 200, message = "Server updated"),
+@ApiResponse(code = 400, message = "Invalid input"),
+@ApiResponse(code = 404, message = "Server not found")
+})
+@PutMapping("/servers/{id}")
+public ResponseEntity<Server> updateServer(
+@ApiParam(value = "ID of the server to update") @PathVariable String id,
+@RequestBody Server server) {
+Optional<Server> optionalServer = repository.findById(id);
+if (!optionalServer.isPresent()) {
+return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+}
+Server updatedServer = optionalServer.get();
+updatedServer.setName(server.getName());
+updatedServer.setLanguage(server.getLanguage());
+updatedServer.setFramework(server.getFramework());
+repository.save(updatedServer);
+return new ResponseEntity<>(updatedServer, HttpStatus.OK);
+}
+
+less
+Copy code
+@ApiOperation(value = "Delete an existing server by ID")
+@ApiResponses(value = {
+        @ApiResponse(code = 204, message = "Server deleted"),
+        @ApiResponse(code = 404, message = "Server not found")
+})
+@DeleteMapping("/servers/{id}")
+public ResponseEntity<Void> deleteServer(
+        @ApiParam(value = "ID of the server to delete") @PathVariable String id) {
+    Optional<Server> optionalServer = repository.findById(id);
+    if (!optionalServer.isPresent()) {
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
+    repository.delete(optionalServer.get());
+    return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+}
+
+@ApiOperation(value = "Find servers by name", response = Server.class)
+@ApiResponses(value = {
+        @ApiResponse(code = 200, message = "Successfully retrieved server(s)"),
+        @ApiResponse(code = 404, message = "Server not found")
+})
+@GetMapping("/servers/search")
+public ResponseEntity<List<Server>> findServersByName(
+        @ApiParam(value = "Name to search for") @RequestParam String name) {
+    List<Server> servers = repository.findAllByNameContainsIgnoreCase(name);
+    if (servers.isEmpty()) {
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
+    return new ResponseEntity<>(servers, HttpStatus.OK);
+}
+}
+
+// ServerApplication.java
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class ServerApplication {
+public static void main(String[] args) {
+SpringApplication.run(ServerApplication.class, args);
+}
+}
+
+// application.properties
+spring.data.mongodb.host=localhost
+spring.data.mongodb.port=27017
+spring.data.mongodb.database=servers_db
+
+#swagger
+springfox.documentation.swagger.v2.path=/api-docs
+
+#swagger-ui
+springfox.documentation.swagger.ui.path=/swagger-ui.html
