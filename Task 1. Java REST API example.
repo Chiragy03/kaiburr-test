@@ -1,0 +1,132 @@
+Server.java
+
+import lombok.Data;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Data
+@Document(collection = "servers")
+public class Server {
+    @Id
+    private String id;
+    private String name;
+    private String language;
+    private String framework;
+}
+
+ServerRepository.java
+
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+public interface ServerRepository extends MongoRepository<Server, String> {
+}
+
+
+ServerService.java
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class ServerService {
+    @Autowired
+    private ServerRepository serverRepository;
+
+    public List<Server> findAll() {
+        return serverRepository.findAll();
+    }
+
+    public Optional<Server> findById(String id) {
+        return serverRepository.findById(id);
+    }
+
+    public String create(Server server) {
+        Server savedServer = serverRepository.save(server);
+        return savedServer.getId();
+    }
+
+    public void update(String id, Server server) {
+        Optional<Server> existingServer = serverRepository.findById(id);
+        if (existingServer.isPresent()) {
+            server.setId(id);
+            serverRepository.save(server);
+        }
+    }
+
+    public void delete(String id) {
+        serverRepository.deleteById(id);
+    }
+
+    public List<Server> findByName(String name) {
+        return serverRepository.findByNameContaining(name);
+    }
+}
+
+
+ServerController.java
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/servers")
+public class ServerController {
+    @Autowired
+    private ServerService serverService;
+
+    @GetMapping
+    public ResponseEntity<?> findAll(@RequestParam(required = false) String id) {
+        if (id == null) {
+            List<Server> servers = serverService.findAll();
+            return new ResponseEntity<>(servers, HttpStatus.OK);
+        } else {
+            Optional<Server> server = serverService.findById(id);
+            if (server.isPresent()) {
+                return new ResponseEntity<>(server.get(), HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+        }
+    }
+
+    @PutMapping
+    public ResponseEntity<?> create(@RequestBody Server server) {
+        String id = serverService.create(server);
+        return new ResponseEntity<>(id, HttpStatus.CREATED);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable String id) {
+        serverService.delete(id);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<?> findByName(@RequestParam String name) {
+        List<Server> servers = serverService.findByName(name);
+        if (!servers.isEmpty()) {
+            return new ResponseEntity<>(servers, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<?> update(@PathVariable String id, @RequestBody Server server) {
+        serverService.update(id, server);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+}
+
+
+To run the application, you can use the following command:
+
+mvn spring-boot:run
