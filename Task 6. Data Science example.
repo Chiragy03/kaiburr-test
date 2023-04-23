@@ -1,0 +1,66 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+
+# Load data
+df = pd.read_csv('Consumer_Complaints.csv', encoding='utf-8')
+
+# Drop columns with missing values
+df = df.dropna(subset=['Consumer complaint narrative', 'Product'])
+
+# Map product names to category numbers
+categories = {'Credit reporting, repair, or other': 0, 'Debt collection': 1, 'Consumer Loan': 2, 'Mortgage': 3}
+df['category_id'] = df['Product'].map(categories)
+
+# Explanatory Data Analysis
+plt.figure(figsize=(10, 4))
+df['Product'].value_counts().plot(kind='bar');
+
+# Feature Engineering
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+
+nltk.download('stopwords')
+stopwords = stopwords.words('english')
+ps = PorterStemmer()
+
+def preprocess_text(text):
+    # Remove non-alphabetic characters
+    text = re.sub('[^A-Za-z]', ' ', text)
+    # Convert to lowercase
+    text = text.lower()
+    # Remove stopwords
+    text = ' '.join([word for word in text.split() if word not in stopwords])
+    # Stem words
+    text = ' '.join([ps.stem(word) for word in text.split()])
+    return text
+
+df['clean_text'] = df['Consumer complaint narrative'].apply(preprocess_text)
+
+# Text Pre-Processing
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split(df['clean_text'], df['category_id'], test_size=0.3, random_state=42)
+
+text_clf = Pipeline([('vect', CountVectorizer()), ('tfidf', TfidfTransformer()), ('clf', MultinomialNB())])
+
+text_clf.fit(X_train, y_train)
+
+# Model Evaluation
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+
+predicted = text_clf.predict(X_test)
+print('Accuracy:', accuracy_score(y_test, predicted))
+print('Confusion Matrix:\n', confusion_matrix(y_test, predicted))
+print('Classification Report:\n', classification_report(y_test, predicted))
+
+# Prediction
+text = "I am having trouble with my mortgage payments"
+category = text_clf.predict([preprocess_text(text)])
+print('Category:', category)
